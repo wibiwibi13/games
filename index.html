@@ -47,18 +47,42 @@
 
   /* soal: 2 kolom x 5 baris */
   .questions {
-    display:grid; grid-template-columns:1fr 1fr; gap:10px;
+    display:grid; grid-template-columns:1fr 1fr; gap:12px;
   }
+
+  /* nomor urut di LUAR kotak soal (lingkaran) */
+  .qitem {
+    display:flex; align-items:center; gap:8px;
+    min-width:0;   /* penting: izinkan isi menyusut, tidak meluber */
+  }
+  .qnum {
+    flex-shrink:0;
+    width:42px; height:42px; border-radius:50%;
+    background:linear-gradient(135deg,#42a5f5,#1e88e5);
+    color:#fff; font-size:20px; font-weight:bold;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 3px 0 rgba(0,0,0,.2);
+  }
+  .qitem:nth-child(even) .qnum { background:linear-gradient(135deg,#66bb6a,#43a047); }
+
   .qbox {
-    font-size:clamp(20px,3.2vh,30px); font-weight:bold; background:#e8eaf6; color:#333;
-    padding:8px 12px; border-radius:12px; border:3px dashed #764ba2;
+    flex:1;
+    min-width:0;   /* penting agar kotak tidak meluber keluar grid */
+    font-size:clamp(18px,2.8vh,28px); font-weight:bold; background:#e8eaf6; color:#333;
+    padding:6px 10px; border-radius:12px; border:3px dashed #764ba2;
     display:flex; align-items:center; justify-content:space-between; gap:8px;
+    white-space:nowrap;      /* soal tetap 1 baris, tidak patah */
   }
+  .qbox > span { overflow:hidden; text-overflow:ellipsis; }
+
   .drop-zone {
-    min-width:70px; height:52px; border-radius:10px; background:#fff;
+    flex-shrink:0;
+    min-width:64px; max-width:80px; height:50px; border-radius:10px; background:#fff;
     border:3px dashed #aaa; display:flex; align-items:center; justify-content:center;
     font-weight:bold; color:#764ba2; transition:.15s; cursor:pointer;
+    padding:0 6px;
   }
+
   .drop-zone.hover { background:#fff3c4; border-color:#ff9800; transform:scale(1.1); }
   .drop-zone.filled { background:#42a5f5; border-color:#1e88e5; color:#fff; }
   .qbox.correct .drop-zone { background:#c8f7c5; border-color:#4caf50; color:#2e7d32; }
@@ -89,7 +113,6 @@
     font-weight:bold; color:#764ba2; margin-bottom:12px; }
   #btnCek { background:linear-gradient(135deg,#66bb6a,#43a047); padding:14px 50px; font-size:28px; }
 
-  .score-emoji { font-size:85px; }
   .score-text { font-size:65px; font-weight:bold; color:#764ba2; margin:10px 0; }
   .stars { font-size:45px; margin-bottom:18px; }
   .btn-row { display:flex; gap:15px; justify-content:center; flex-wrap:wrap; }
@@ -98,6 +121,8 @@
     html,body{overflow:auto}
     .game-area{flex-direction:column}
     .questions{grid-template-columns:1fr}
+    .qnum{ width:34px; height:34px; font-size:16px; }
+    .drop-zone{ height:44px; min-width:56px; }
   }
 </style>
 </head>
@@ -130,6 +155,13 @@
     <span id="lblLevel">Level 1</span>
     <span id="lblSkor">Skor: 0</span>
   </div>
+
+  <!-- skor hasil (muncul setelah koreksi) — DI ATAS -->
+  <div id="areaSkor" style="display:none; margin:5px 0 10px;">
+    <div class="score-text" style="font-size:44px; margin:0;" id="skorInline">Skor: 0</div>
+    <div class="stars" style="font-size:32px; margin:5px 0;" id="bintangInline"></div>
+  </div>
+
   <div class="game-area">
     <div class="col-soal">
       <div class="col-title">📝 Soal &nbsp;<small style="font-size:15px;color:#888">(klik / tarik jawaban ke kotak)</small></div>
@@ -140,17 +172,15 @@
       <div class="answers" id="jawabContainer"></div>
     </div>
   </div>
-  <button class="btn" id="btnCek" onclick="cekJawaban()">✅ Periksa Jawaban</button>
-</div>
 
-<!-- HALAMAN 4: HASIL -->
-<div class="page" id="page4">
-  <div class="score-emoji" id="hasilEmoji">🎉</div>
-  <div class="score-text" id="hasilSkor">0/10</div>
-  <div class="stars" id="hasilBintang"></div>
-  <div class="btn-row">
-    <button class="btn" style="background:linear-gradient(135deg,#42a5f5,#1e88e5)" onclick="ulangLevel()">🔁 Ulangi</button>
-    <button class="btn" style="background:linear-gradient(135deg,#ab47bc,#8e24aa)" onclick="goTo(2)">📚 Pilih Level</button>
+  <button class="btn" id="btnCek" onclick="cekJawaban()">✅ Periksa Jawaban</button>
+
+  <!-- tombol (muncul setelah koreksi) — DI BAWAH -->
+  <div id="areaTombol" style="display:none; margin-top:15px;">
+    <div class="btn-row">
+      <button class="btn" style="background:linear-gradient(135deg,#42a5f5,#1e88e5)" onclick="ulangLevel()">🔁 Main Lagi</button>
+      <button class="btn" style="background:linear-gradient(135deg,#ab47bc,#8e24aa)" onclick="goTo(2)">📚 Ganti Level</button>
+    </div>
   </div>
 </div>
 
@@ -185,18 +215,6 @@ function suaraLetak(){ nada(400, 0.1, 'sine', 0.3); }
 function suaraKembali(){ nada(300, 0.1, 'sine', 0.25); }
 function suaraBenar(){ nada(523,0.12,'sine',0.3,0); nada(659,0.12,'sine',0.3,0.1); nada(784,0.12,'sine',0.3,0.2); nada(1047,0.25,'sine',0.3,0.3); }
 function suaraSalah(){ nada(220,0.25,'sawtooth',0.2,0); nada(160,0.35,'sawtooth',0.2,0.15); }
-function suaraSelesai(benar){
-  if(benar >= 7){
-    nada(523,0.2,'square',0.2,0);   nada(587,0.2,'square',0.2,0.15);
-    nada(659,0.2,'square',0.2,0.3); nada(784,0.2,'square',0.2,0.45);
-    nada(1047,0.4,'square',0.25,0.6);
-  } else if(benar >= 4){
-    nada(523,0.2,'square',0.2,0); nada(659,0.2,'square',0.2,0.15); nada(784,0.3,'square',0.2,0.3);
-  } else {
-    nada(400,0.25,'sawtooth',0.15,0); nada(350,0.25,'sawtooth',0.15,0.2);
-    nada(300,0.25,'sawtooth',0.15,0.4); nada(250,0.35,'sawtooth',0.15,0.6);
-  }
-}
 
 /* ============ LOGIKA GAME ============ */
 var level = 1;
@@ -220,8 +238,9 @@ function pilihLevel(n){
 }
 
 function buatSoal(){
-      document.querySelectorAll('.qbox').forEach(function(q){ q.classList.remove('correct','wrong'); });
+  document.querySelectorAll('.qbox').forEach(function(q){ q.classList.remove('correct','wrong'); });
   document.querySelectorAll('.drop-zone').forEach(function(z){ z.classList.remove('filled'); });
+
   var maks = level * 10;
   soalList = [];
   var dipakai = {};
@@ -237,22 +256,35 @@ function buatSoal(){
 
   var jawaban = [];
   for(var i=0; i<soalList.length; i++){ jawaban.push(soalList[i].jawab); }
-  while(jawaban.length < 10){
-    var r = Math.floor(Math.random() * maks) + 2;
-    if(jawaban.indexOf(r) === -1){ jawaban.push(r); }
+
+  // tambah 2 jawaban pengecoh (salah, tapi tidak terlalu jauh dari jawaban asli)
+  while(jawaban.length < 12){
+    var acak = soalList[Math.floor(Math.random() * soalList.length)];
+    var offset = (Math.random() < 0.5) ? -1 : 1;
+    var r = acak.jawab + offset;
+    if(r >= 2 && jawaban.indexOf(r) === -1){ jawaban.push(r); }
   }
   jawaban.sort(function(){ return Math.random() - 0.5; });
 
-  // Render soal: grid 2 kolom x 5 baris (nomor urut 1-10)
+  // Render soal: lingkaran nomor di LUAR kotak, grid 2 kolom x 5 baris
   var sc = document.getElementById('soalContainer');
   sc.innerHTML = '';
   for(var i=0; i<soalList.length; i++){
+    var item = document.createElement('div');
+    item.className = 'qitem';
+
+    var num = document.createElement('div');
+    num.className = 'qnum';
+    num.textContent = (i + 1);
+
     var d = document.createElement('div');
     d.className = 'qbox';
-    d.innerHTML = '<span><small style="color:#9fa8da">' + (i+1) + '.</small> ' +
-                  soalList[i].a + ' + ' + soalList[i].b + ' =</span>' +
+    d.innerHTML = '<span>' + soalList[i].a + ' + ' + soalList[i].b + ' =</span>' +
                   '<div class="drop-zone" data-index="' + i + '">?</div>';
-    sc.appendChild(d);
+
+    item.appendChild(num);
+    item.appendChild(d);
+    sc.appendChild(item);
   }
 
   // Render jawaban di kolom kanan
@@ -282,7 +314,6 @@ function pilihJawabanKlik(ev){
   ev.stopPropagation();
 
   if(jawabanTerpilih === el){
-    // klik jawaban yang sama lagi = batal pilih
     batalkanPilihan();
     suaraKembali();
     return;
@@ -299,13 +330,11 @@ function klikDropZone(ev){
   ev.preventDefault();
   ev.stopPropagation();
 
-  // kalau ada jawaban sedang dipilih -> pindahkan ke kotak ini
   if(jawabanTerpilih){
     letusKotak(z, jawabanTerpilih);
     return;
   }
 
-  // kalau tidak ada yang dipilih & kotak berisi -> kembalikan jawabannya
   if(z.dataset.jawab){
     kembalikanDari(z);
     suaraKembali();
@@ -313,7 +342,6 @@ function klikDropZone(ev){
 }
 
 function letusKotak(z, answerEl){
-  // kembalikan isi lama kotak ini (kalau ada)
   if(z.dataset.jawab){
     var lama = z.dataset.jawab;
     var all = document.querySelectorAll('.answer');
@@ -323,7 +351,7 @@ function letusKotak(z, answerEl){
   }
   z.textContent = answerEl.textContent;
   z.dataset.jawab = answerEl.textContent;
-  z.classList.add('filled');          // <-- kotak jadi BIRU
+  z.classList.add('filled');          // kotak jadi BIRU
   answerEl.classList.add('used');
   batalkanPilihan();
   suaraLetak();
@@ -337,11 +365,9 @@ function kembalikanDari(z){
     if(all[j].textContent === lama){ all[j].classList.remove('used'); break; }
   }
   z.textContent = '?';
-  z.classList.remove('filled');       // <-- biru hilang, kembali putih
+  z.classList.remove('filled');       // biru hilang, kembali putih
   delete z.dataset.jawab;
 }
-
-
 
 /* ============ MODE DRAG & DROP ============ */
 var dragEl = null;
@@ -355,14 +381,13 @@ function posisi(ev){
 function mulaiDrag(ev){
   var target = ev.target.closest ? ev.target.closest('.answer') : null;
   if(!target || target.classList.contains('used')){ return; }
-  // tandai bahwa ini potensi drag; klik tunggal ditangani click handler
   dragEl = target;
   dragEl.classList.add('dragging');
 
   ghost = document.createElement('div');
   ghost.className = 'ghost';
   ghost.textContent = dragEl.textContent;
-  ghost.style.display = 'none';   // baru muncul setelah jari bergerak
+  ghost.style.display = 'none';
   document.body.appendChild(ghost);
 }
 
@@ -424,55 +449,59 @@ document.addEventListener('click', function(ev){
 /* ============ CEK JAWABAN ============ */
 function cekJawaban(){
   var terisi = 0;
-  var boxes = document.querySelectorAll('.qbox');
-  for(var i=0; i<boxes.length; i++){
-    var z = boxes[i].querySelector('.drop-zone');
-    var isi = parseInt(z.textContent);
+  var zones = document.querySelectorAll('.drop-zone');
+  for(var i=0; i<zones.length; i++){
+    var isi = parseInt(zones[i].textContent);
     if(!isNaN(isi)){ terisi++; }
   }
 
-  // >>> Jika belum semua diisi: HANYA pop-up, TANPA koreksi warna <<<
+  // Jika belum semua diisi: HANYA pop-up, TANPA koreksi warna
   if(terisi < 10){
     suaraSalah();
     alert('Isi dulu semua kotak ya! Sudah terisi ' + terisi + ' dari 10');
-    return;   // berhenti di sini, tidak ada hijau/merah sama sekali
+    return;
   }
 
-  // Semua sudah diisi -> baru koreksi
+  // Semua sudah diisi -> koreksi
   var benar = 0;
-  for(var i=0; i<boxes.length; i++){
-    var z = boxes[i].querySelector('.drop-zone');
+  for(var i=0; i<soalList.length; i++){
+    var z = document.querySelector('.drop-zone[data-index="' + i + '"]');
+    var qbox = z.closest('.qbox');
     var isi = parseInt(z.textContent);
     if(isi === soalList[i].jawab){
-      boxes[i].classList.add('correct'); boxes[i].classList.remove('wrong');
+      qbox.classList.add('correct'); qbox.classList.remove('wrong');
       benar++;
     } else {
-      boxes[i].classList.add('wrong'); boxes[i].classList.remove('correct');
+      qbox.classList.add('wrong'); qbox.classList.remove('correct');
     }
   }
 
   if(benar > 5){ suaraBenar(); } else { suaraSalah(); }
   document.getElementById('lblSkor').textContent = 'Skor: ' + benar;
-  setTimeout(function(){ tampilkanHasil(benar); }, 1200);
-}
 
-
-function tampilkanHasil(benar){
-  suaraSelesai(benar);
-  document.getElementById('hasilSkor').textContent = benar + '/10';
-  var emoji = benar >= 9 ? '🏆' : benar >= 7 ? '🎉' : benar >= 4 ? '😊' : '💪';
-  document.getElementById('hasilEmoji').textContent = emoji;
+  // tampilkan skor di ATAS
+  document.getElementById('areaSkor').style.display = 'block';
+  document.getElementById('skorInline').textContent = 'Skor: ' + benar + '/10';
   var bintang = Math.max(1, Math.round(benar / 2));
   var s = '';
   for(var i=0; i<bintang; i++){ s += '⭐'; }
-  document.getElementById('hasilBintang').textContent = s;
-  goTo(4);
+  document.getElementById('bintangInline').textContent = s;
+
+  // tampilkan tombol di BAWAH
+  document.getElementById('areaTombol').style.display = 'block';
+
+  // sembunyikan tombol periksa agar tidak diklik 2x
+  // document.getElementById('btnCek').style.display = 'none';
+
+  document.getElementById('lblLevel').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function ulangLevel(){
   suaraLevel();
+  document.getElementById('areaSkor').style.display = 'none';
+  document.getElementById('areaTombol').style.display = 'none';
+  document.getElementById('btnCek').style.display = 'inline-block';
   buatSoal();
-  goTo(3);
 }
 </script>
 </body>
